@@ -4,15 +4,15 @@
 - [Trace visualization](SubatechCloudChamber_Doc2.pdf)
 
 # Software: code(python3) in src directory
-- src/webcam_dacq.py: image acquisition from a web camera (to be used in specific laptop for image data taking)
+- src/webcam_dacq.py: image acquisition from a web camera (to be used in specific laptop for image data taking). Code in the PC Linux
 
-- src/two_webcam_dacq.py: image acquisition from two web cameras (to be used in specific laptop for image data taking) ir order to estimate the thickness of the active volume of the cloud chamber
+- src/two_webcam_dacq.py: image acquisition from two web cameras (to be used in specific laptop for image data taking) ir order to estimate the thickness of the active volume of the cloud chamber. Code in the PC Linux
 
 - src/sPhone_dacq.py: image acquisition from a smartphone
 
-- src/ processing.py: basic image processing (old Gilles G development)
+- src/processing.py: basic image processing (old Gilles G development)
 
-- sec/ cloudChamberCommonCode.py : common code share by other py files
+- src/cloudChamberCommonCode.py : common code share by other py files
 
 - src/findChessboardCorner.py: Code to find the corner of an ideal chess board and to fin the camera parameter for aberration correction 
 
@@ -73,7 +73,7 @@ cluster[13] = list of 2d pixel values members of the cluster
 - src/distributionProcess.py
 --- plots with good and not merged clusters in a fiducial volume
 
-**Analysis on June 23 2024**
+**Analysis on June 23 2024 on 22/01/2024 data taking**
 Simulation of 10^6 222Rn tracks in a box of 100 x 250 x 250 mm^2 with a active height of 5 mm
 The total volume of the box in the simulation is 0.00625 m^2
 So the total number of tracks in a m^3 is 1,6e8 = 1e6/0.00625 
@@ -88,12 +88,22 @@ The total area is 325 x 150 pixel. If 1 pixel = 1 mm, the fiducial area in the s
 
 Therefore 1.17 220Rn tracks per second, represents about 1,17 / 1.74e-5 = 67,2 kBq / m^2 of 222Rn
 
-**Analysis on September 25 2024**
+**Analysis on September 25 2024 on 22/01/2024 data taking**
+Simulation of 10^6 222Rn tracks in a box of 200 x 250 x 250 mm^2 with a active height of 100 mm
+The total volume of the box in the simulation is 0.01250 m^2
+So the total number of tracks in a m^3 is 8,0e7 = 1e6/0.0120  
+The simulation shows that 353922 tracks decays in the active volume : 100 x 250 x 250 mm^2
+The efficiency is then 4.4e-3 = 353922 / 8,0e7
+
 In the experimental data on January 2024, one has identified about 1611 tracks in a gaussian peak about 38.4 pixel (one pixel is about 1 mm) and a width of 19.9%
 The data taking took place on January 22 2025 between 11:40 and 12:00 am, so 20 minutes = 1200 s
 The rate is 1.34 = 1611/1200 222Rn tracks in the cloud chamber per second
 
-The total fiducial area is 170 mm x 360 mm = 17 x 36 cm^2 = 612 cm^2
+The total fiducial area is 170 mm x 360 mm = 17 x 36 cm^2 = 612 cm^2 
+1.34 / 4,4e-3 = 300 Bq/m^3
+
+
+
 
 
 
