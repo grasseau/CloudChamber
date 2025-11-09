@@ -83,6 +83,7 @@ def main() :
     angleDistribution      = np.empty(0,dtype=float)
     sizeDistribution       = np.empty(0,dtype=float)
   
+ 
 
     mergedRatio = 0.
     noMergedCounter =0 
