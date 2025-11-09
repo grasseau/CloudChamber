@@ -241,6 +241,7 @@ class Processing:
       clusterForImg = []
       while( len(neigh) > 0 ):
         (i, j) = neigh.pop()
+
         done[i,j] = 1
         # imgGrp[i,j] = grp
         clusterForImg.append((i,j))  
