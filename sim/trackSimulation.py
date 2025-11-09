@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Python script for simulation of alpha tracks in the cloud chamber
 # v1 Gines Martinez  Mars 2023 (gines.martinez@subatech.in2p3.fr )
+# v2 Gines Martinez Janvier 2025
 
 # Reference system is the center of the cloud chamber, on the bottom of the active volume
 # z value increase from 0 (bottom part, close to the alcohol to the higher part until z=100 mm)
@@ -18,14 +19,36 @@ import matplotlib.mlab as mlab
 from scipy.stats import norm
 from scipy.optimize import curve_fit
 
+# Reminder : export PYTHONPATH='/Users/martinez/Work/GitLocalRepository/CloudChamber/src/'
+# Area in pixel from Common Code
+from cloudChamberCommonCode import interestArea_x1
+from cloudChamberCommonCode import interestArea_y1
+from cloudChamberCommonCode import interestArea_x2
+from cloudChamberCommonCode import interestArea_y2
+# Calibration factor in mm/pixel
+from cloudChamberCommonCode import calibrationFactor
+# Size of the non fiducial volume
+from cloudChamberCommonCode import coronaSize
+# minimal length of the projected alpha track
+from cloudChamberCommonCode import minLength
+# maximal length of the projected alpha track
+from cloudChamberCommonCode import maxLength
+
+# Calculation of the volume
+xLength = (interestArea_x2 - interestArea_x1) * calibrationFactor  # in mm
+yLength = (interestArea_y2 - interestArea_y1) * calibrationFactor  # in mm
+zLength = 130 # in mm
+
 # Settings of the logger
 MY_FORMAT = "%(asctime)-24s %(levelname)-6s %(message)s"
 logging.basicConfig(format=MY_FORMAT, level=logging.INFO)
 my_logger=logging.getLogger()
 my_logger.info("Simulations of alpha tracks in the cloud chamber")
+my_logger.info("Volume Lx Ly Lz :  %4.8f x  %4.8f x  %4.8f mm3" %(xLength, yLength, zLength))
 
 # Track number to be simulated in the full volume 
-trackNumber = 1000000
+trackNumber = 10000
+my_logger.info("Number of simulated track in the volume is %d" %(trackNumber))
 # Track number counter
 trackNumberCounter =0 
 # Track seen in the cloud chamber fully include in the fiducial volume
@@ -33,28 +56,13 @@ trackNumberSeen = 0
 trackNumberSeenIn = 0
 trackNumberSeenOut = 0
 
-# Minimal length to consider the alpha track
-alphaProjectionThreshold=10.
-
-# Considered volume fullVolumeWidth**2 x fullVolumeHeight
-# We consider a horizontal area of 0.25x0.25 m^2 = 1/16 m^2
-# which correspond with the area covered by the picture
-# Tracks which partially go out of this area are rejected
-# there the fullVolumeWidth**2 can be considered as the fiducial area
-fullVolumeWidth = 250. # in mm
-# the height considered is 100 mm which correspond with the height of the 
-# cloud chamber. In addition the projected path length of an alpha particle
-# of 10 MeV in dry air is 10 cm, therefore we assume that alpha path length are below 
-# 10 cm, which is a conservative assumption.
-fullVolumeHeight = 200. # in mm
-
 # It is not clear what is the thickness of the active volume. 
 # The estimation given in appendix C is 2-3 mm
 # A additional question could be the uniformity of the active volume 
 # in the horizontal plane We assume perfect uniformity of the active volume 
 # thickness
-activeVolumeHeight = 70. # in mm, see page 4 of appendix C
-activeVolumeHeightDispersion = 0.00001 # in relative units ad hoc input
+activeVolumeHeight = 60. # in mm, see page 4 of appendix C
+my_logger.info("Height of the active volume :  %4.8f  mm" %(activeVolumeHeight))
 
 # Parameter of the Bethe-Bloch formula in W. R. Leo page 24
 # One has to pay attention that this formula is valid for
@@ -64,10 +72,11 @@ activeVolumeHeightDispersion = 0.00001 # in relative units ad hoc input
 betheBlochNormalisation = 0.1535 # MeV cm^2/g 
 electronMass = 511000 # eV/c^2
 alphaCharge = 2 # electron charge units
-alphaRelativeStragglingRange = 0.037 #0.037 # See SRIM Calculation form Vincent METIVIER in Git repository
+alphaRelativeStragglingRange = 0.1 #0.037 # See SRIM Calculation form Vincent METIVIER in Git repository
 alphaMass = 3727 # MeV/c^2
 airZoverA = 0.5
-airDensity  = 0.00120479 # g/cm^3, see Geant4 Material Database
+airDensity  = 0.00120479*293.0/298.0 # g/cm^3, see Geant4 Material Database (at 25 degres)
+#airDensity  = 0.00120479*293./258. # g/cm^3, extrapolation at -15 degres
 airExcitationPotential = 85.7 # eV, see Geant4 Material Database
 
 def betheBloch(alphaEnergy) : 
@@ -136,7 +145,7 @@ def rangeNIST(alphaEnergy) :
 # Alpha emission point are assumed to be uniformly random in the
 # considered volume 
 def alphaEmmission() :
-    vertex = [random.uniform(-fullVolumeWidth/2., fullVolumeWidth/2.), random.uniform(-fullVolumeWidth/2., fullVolumeWidth/2.), random.uniform(0., fullVolumeHeight)]
+    vertex = [random.uniform(-xLength/2., xLength/2.), random.uniform(-yLength/2., yLength/2.), random.uniform(0., zLength)]
     return vertex
 
 # Alpha direction (u, v, w) is also defined as a list
@@ -205,23 +214,43 @@ def main() :
     lengthDistributionIn = np.zeros(trackNumber,dtype=float)
     lengthDistributionOut = np.zeros(trackNumber,dtype=float)
     
+    # Relative mixing of radionuclides
+    relativeRadionuclideRatio = [0.0, 0.80, 0.998]
+
     while trackNumberCounter < trackNumber-1 :
-        trackNumberCounter=trackNumberCounter+1 
+        trackNumberCounter=trackNumberCounter+1
+
+        # Vertex Generation of the alpha 
         vertex = alphaEmmission()
         my_logger.debug("Alpha emmission is %4.2f,%4.2f,%4.2f" %(vertex[0],vertex[1],vertex[2]))
 
+        # Modelling of the density correction to the track length
+        # An approximate effect on the air density as a function of z vertex of the alpha emission
+        # It is assumed T=25 degrees , so air dry density : see airDensity variable value
+        # vertex[2] between 0 and zLength of the cloud chamber. At z=0 25 degrees, at z=zLength -25 degrees 
+        alphaLengthCorrection = (zLength - vertex[2])/zLength * 248.0/298.0
+
+        # Verification if the alpha decay happens inside the active volume
         if (vertex[2]>0. and vertex[2]<activeVolumeHeight) :
             trackNumberVertexIn = trackNumberVertexIn + 1
 
+        # Generation isotopically of the alpha direction
         u = alphaDirection()
         my_logger.debug("Alpha direction is %4.4f, %4.4f, %4.4f" %(u[0], u[1], u[2]))
     
         # Choice of the radionuclide and Smearing of the alpha Length
+        choice = np.random.uniform(0.,1.)
         choiceRadionuclide = 0
-        #np.random.randint(0,3)
-        if (choiceRadionuclide == 2) :
-            choiceRadionuclide = np.random.randint(0,2)
-        alphaLengthEByE = alphaLength[choiceRadionuclide] * np.random.normal(1.0, alphaRelativeStragglingRange)     
+     
+        if (choice>relativeRadionuclideRatio[1]) :
+            choiceRadionuclide = 1
+            if (choice>relativeRadionuclideRatio[2]) :
+                #print(choice)               
+                choiceRadionuclide = 2
+                #print(alphaLength[2])
+        
+        # Calculation of the alpha track length in dry air taking into account the struggling and temperature evolution on the vertical axis
+        alphaLengthEByE = alphaLength[choiceRadionuclide] * np.random.normal(1.0, alphaRelativeStragglingRange) #* alphaLengthCorrection * 1.2
 
         # straight line \vec{v}(t) = \vec{vertex} + t \vec{u}
         alphaProjection = 0. 
@@ -260,6 +289,7 @@ def main() :
         x2 = vertex[0] + t2*u[0]
         y2 = vertex[1] + t2*u[1]
         alphaProjection = math.sqrt( (x2-x1)**2 + (y2-y1)**2)
+
         if (alphaProjection<0.) :
             my_logger.info("Alpha emission is %4.2f,%4.2f,%4.2f" %(vertex[0],vertex[1],vertex[2]))
             my_logger.info("Alpha direction is %4.4f, %4.4f, %4.4f" %(u[0], u[1], u[2]))
@@ -270,7 +300,7 @@ def main() :
         x_center = vertex[0] + (t1+t2)/2.*u[0]
         y_center = vertex[1] + (t1+t2)/2.*u[1]
         # Calculer average t as the center of the alphatrack to selection on a fiducial volume with respect to the center, as it is done with real data
-        if ( (alphaProjection>alphaProjectionThreshold) and (x_center>-fullVolumeWidth/2. and x_center<fullVolumeWidth/2.) and (y_center>-fullVolumeWidth/2. and y_center<fullVolumeWidth/2.) ) : 
+        if ( (alphaProjection>minLength) and (x_center>-(xLength/2.-coronaSize) and x_center<(xLength-coronaSize)/2.) and (y_center>-(yLength/2.-coronaSize) and y_center<(yLength/2.-coronaSize)) ) : 
             # Track seen
             trackNumberSeen+=1
             lengthDistribution[trackNumberSeen]=alphaProjection
@@ -291,16 +321,16 @@ def main() :
     my_logger.info("Track number Vertex IN is %6d " %(trackNumberVertexIn))
     my_logger.info("Track number Both Vertex IN is %6d " %(trackNumberBothVertexIn))
 
-    fig, ax = plt.subplots(nrows=3, ncols=1, figsize=(15, 10))
+    fig, ax = plt.subplots(nrows=3, ncols=1, figsize=(5, 10))
 
     # Main Plot with the length track distribution
     ax[0].set_yscale('log')
-    ax[0].set_ylim(1., 300000)
-    ax[0].set_xlim(0.,60.)
+    ax[0].set_ylim(0.1, 10000)
+    ax[0].set_xlim(0.,100.)
     ax[0].set_xlabel(r"$\rm{Track \; length \; l (mm)}$")
     ax[0].set_ylabel(r"$\rm{dN/dl \; (mm)}$")
     #Fixing bin width
-    binWidth =0.5
+    binWidth =1.
     lengthValues=np.arange(min(lengthDistribution), max(lengthDistribution) + binWidth, binWidth)
     # bin center calculation
     lengthValuesCenter = np.array([0.5 * (lengthValues[i] + lengthValues[i+1]) for i in range(len(lengthValues)-1)])
@@ -325,8 +355,8 @@ def main() :
     
     # alpha tracks with one extreme out of the active volume
     ax[1].set_yscale('log')
-    ax[1].set_ylim(1., 300000)
-    ax[1].set_xlim(0.,60.)
+    ax[1].set_ylim(0.1, 10000)
+    ax[1].set_xlim(0.,100.)
     ax[1].set_xlabel(r"$\rm{Track \; length \; Out \; l (mm)}$")
     ax[1].set_ylabel(r"$\rm{dN/dl \; (mm)}$")
     histoValuesOut, lengthValuesOut, patches =  ax[1].hist(lengthDistributionOut[(lengthDistributionOut>0) & (lengthDistributionOut<100)], bins=lengthValues, log=True )
@@ -337,8 +367,8 @@ def main() :
 
     # alpha tracks with both extremes in the active volume
     ax[2].set_yscale('log')
-    ax[2].set_ylim(1., 300000)
-    ax[2].set_xlim(0.,60.)
+    ax[2].set_ylim(0.1, 10000)
+    ax[2].set_xlim(0.,100.)
     ax[2].set_xlabel(r"$\rm{Track \; length \; In \; l (mm)}$")
     ax[2].set_ylabel(r"$\rm{dN/dl \; (mm)}$")
     histoValuesIn, lengthValuesIn, patches =  ax[2].hist(lengthDistributionIn[(lengthDistributionIn>0) & (lengthDistributionIn<100)], bins=lengthValues, log=True )
@@ -411,7 +441,7 @@ def main() :
    
     #ax[2].plot(lengthValuesInterval, gaussian(lengthValuesInterval, *popt), color='blue', linewidth=2.5, label=r'Fitted function')
 
-    
+    plt.savefig("TrackSimulationResults.pdf")
     plt.show()
 
 if __name__ == "__main__" :
